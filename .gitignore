@@ -1,0 +1,3 @@
+dist/
+/terraform-provider-msecrets*
+.DS_Store
