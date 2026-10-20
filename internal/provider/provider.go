@@ -116,6 +116,7 @@ func (p *Provider) Resources(_ context.Context) []func() resource.Resource {
 		NewClusterResource,
 		NewGitHubConsumerResource,
 		NewKubernetesConsumerResource,
+		NewExpoConsumerResource,
 	}
 }
 

@@ -55,6 +55,7 @@ Creating environments and registering clusters needs a platform admin. Consumers
 | `msecrets_cluster` | A cluster's JWT login `k8s-{name}`: `discovery_url`, `jwks` (from `kubectl get --raw /openid/v1/jwks`) or `pinned_keys` | trust, keys, issuer | `name` |
 | `msecrets_github_consumer` | A repository's GitHub environment, logging in with GitHub OIDC | `grants`, `writes` (`infra-*`) | the environment, name, repository, GitHub environment |
 | `msecrets_kubernetes_consumer` | A namespace's service account (default `openbao-eso`) in a registered cluster | `grants` | the environment, name, cluster, namespace, service account |
+| `msecrets_expo_consumer` | An EAS project's environment; the server rotates a token into its `VAULT_TOKEN` | `grants` | the environment, name, project ID, EAS environment, variable |
 
 Data sources: `msecrets_meta` (the OpenBao address, for `VAULT_ADDR`) and `msecrets_environment`.
 
@@ -111,7 +112,17 @@ resource "github_actions_environment_variable" "vault_role" {
   variable_name = "VAULT_ROLE"
   value         = msecrets_github_consumer.ui.role
 }
+
+resource "msecrets_expo_consumer" "app" {
+  environment     = msecrets_environment.staging.id
+  name            = "expo-app"
+  project_id      = "0243b091-8891-427e-804e-718c4e99182d"
+  eas_environment = "development"
+  grants          = ["build-app", "build-app-ci"]
+}
 ```
+
+An Expo consumer's tokens are issued from its token role by the server, whose OpenBao policy must allow that role (`server_expo_token_roles` in `metatavu-secrets-infra`) until the policy allows every `ms-*` token role.
 
 ## Developing
 

@@ -261,6 +261,10 @@ func (s *Server) planConsumer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		consumer.OpenBao.AuthPath = cluster.Mount
+	case client.ConsumerExpo:
+		if consumer.Expo.Variable == "" {
+			consumer.Expo.Variable = "VAULT_TOKEN"
+		}
 	}
 	if consumer.Writes == nil {
 		consumer.Writes = []string{}

@@ -134,6 +134,14 @@ resource "msecrets_github_consumer" "infra" {
   grants             = %s
   writes             = ["infra-*"]
 }
+
+resource "msecrets_expo_consumer" "app" {
+  environment     = "acme/web/staging"
+  name            = "expo-app"
+  project_id      = "0243b091-8891-427e-804e-718c4e99182d"
+  eas_environment = "development"
+  grants          = ["build-app"]
+}
 `, keys, grants)
 	}
 
@@ -151,6 +159,16 @@ resource "msecrets_github_consumer" "infra" {
 					resource.TestCheckResourceAttr("msecrets_kubernetes_consumer.eso", "role", "ms-acme-web-staging-k8s-uks-testing-eso"),
 					resource.TestCheckResourceAttr("msecrets_github_consumer.infra", "auth_path", "github"),
 					resource.TestCheckResourceAttr("msecrets_github_consumer.infra", "writes.0", "infra-*"),
+					resource.TestCheckResourceAttr("msecrets_expo_consumer.app", "variable", "VAULT_TOKEN"),
+					resource.TestCheckResourceAttr("msecrets_expo_consumer.app", "role", "ms-acme-web-staging-expo-app"),
+					resource.TestCheckResourceAttr("msecrets_expo_consumer.app", "auth_path", ""),
+					func(_ *terraform.State) error {
+						expo := server.Consumer("acme/web/staging", "expo-app").Expo
+						if expo == nil || expo.ProjectID != "0243b091-8891-427e-804e-718c4e99182d" || expo.Environment != "development" {
+							return fmt.Errorf("expo target on the server: %+v", expo)
+						}
+						return nil
+					},
 				),
 			},
 			{
@@ -183,6 +201,13 @@ resource "msecrets_github_consumer" "infra" {
 				ResourceName:            "msecrets_github_consumer.infra",
 				ImportState:             true,
 				ImportStateId:           "acme/web/staging:github-acme-infra",
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"accept_findings"},
+			},
+			{
+				ResourceName:            "msecrets_expo_consumer.app",
+				ImportState:             true,
+				ImportStateId:           "acme/web/staging:expo-app",
 				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"accept_findings"},
 			},

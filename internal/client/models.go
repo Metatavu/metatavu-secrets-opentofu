@@ -66,6 +66,7 @@ type Consumer struct {
 	Type        string            `json:"type"`
 	GitHub      *GitHubTarget     `json:"github,omitempty"`
 	Kubernetes  *KubernetesTarget `json:"kubernetes,omitempty"`
+	Expo        *ExpoTarget       `json:"expo,omitempty"`
 	Grants      []string          `json:"grants"`
 	Writes      []string          `json:"writes,omitempty"`
 	OpenBao     *ConsumerOpenBao  `json:"openbao,omitempty"`
@@ -82,6 +83,14 @@ type KubernetesTarget struct {
 	Cluster        string `json:"cluster"`
 	Namespace      string `json:"namespace"`
 	ServiceAccount string `json:"serviceAccount"`
+}
+
+// ExpoTarget is an EAS project's environment, whose variable the server keeps
+// a rotated token in.
+type ExpoTarget struct {
+	ProjectID   string `json:"projectId"`
+	Environment string `json:"environment"`
+	Variable    string `json:"variable,omitempty"`
 }
 
 // ConsumerOpenBao is the consumer's objects in OpenBao.

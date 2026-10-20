@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Metatavu/metatavu-secrets-opentofu/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -41,6 +43,13 @@ type kubernetesConsumerModel struct {
 	Cluster        types.String `tfsdk:"cluster"`
 	Namespace      types.String `tfsdk:"namespace"`
 	ServiceAccount types.String `tfsdk:"service_account"`
+}
+
+type expoConsumerModel struct {
+	consumerModel
+	ProjectID      types.String `tfsdk:"project_id"`
+	EASEnvironment types.String `tfsdk:"eas_environment"`
+	Variable       types.String `tfsdk:"variable"`
 }
 
 // consumerKind is what differs between the consumer resources.
@@ -150,6 +159,53 @@ func NewKubernetesConsumerResource() resource.Resource {
 	}}
 }
 
+// NewExpoConsumerResource is msecrets_expo_consumer.
+func NewExpoConsumerResource() resource.Resource {
+	replace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
+	return &consumerResource[expoConsumerModel]{kind: consumerKind[expoConsumerModel]{
+		typeName: "_expo_consumer",
+		consumer: client.ConsumerExpo,
+		description: "An EAS project's environment, whose builds read OpenBao with a token the server rotates into the EAS variable `variable` " +
+			"(a token role `role`, with no login). Set the environment's `VAULT_ADDR` and `VAULT_PATH` yourself. It may read `grants`.",
+		attributes: map[string]schema.Attribute{
+			"project_id": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "The EAS project ID (`extra.eas.projectId` in the app's configuration).",
+				PlanModifiers:       replace,
+			},
+			"eas_environment": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "`development`, `preview` or `production`.",
+				PlanModifiers:       replace,
+				Validators:          []validator.String{stringvalidator.OneOf("development", "preview", "production")},
+			},
+			"variable": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("VAULT_TOKEN"),
+				MarkdownDescription: "The EAS variable the token is written to. Defaults to `VAULT_TOKEN`.",
+				PlanModifiers:       replace,
+			},
+		},
+		common: func(m *expoConsumerModel) *consumerModel { return &m.consumerModel },
+		toRequest: func(_ context.Context, m *expoConsumerModel, _ *diag.Diagnostics) client.Consumer {
+			return client.Consumer{Expo: &client.ExpoTarget{
+				ProjectID:   m.ProjectID.ValueString(),
+				Environment: m.EASEnvironment.ValueString(),
+				Variable:    m.Variable.ValueString(),
+			}}
+		},
+		fromServer: func(c *client.Consumer, m *expoConsumerModel) {
+			if c.Expo != nil {
+				m.ProjectID = types.StringValue(c.Expo.ProjectID)
+				m.EASEnvironment = types.StringValue(c.Expo.Environment)
+				m.Variable = types.StringValue(c.Expo.Variable)
+			}
+		},
+		writes: func(context.Context, *expoConsumerModel, *diag.Diagnostics) []string { return []string{} },
+	}}
+}
+
 func (r *consumerResource[M]) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + r.kind.typeName
 }
@@ -180,12 +236,12 @@ func (r *consumerResource[M]) Schema(_ context.Context, _ resource.SchemaRequest
 		"policy":          schema.StringAttribute{Computed: true, PlanModifiers: keep},
 		"role": schema.StringAttribute{
 			Computed:            true,
-			MarkdownDescription: "Its OpenBao role: GitHub's `VAULT_ROLE`, or the SecretStore's `role`.",
+			MarkdownDescription: "Its OpenBao role: GitHub's `VAULT_ROLE`, the SecretStore's `role`, or the token role an Expo consumer's tokens are issued from.",
 			PlanModifiers:       keep,
 		},
 		"auth_path": schema.StringAttribute{
 			Computed:            true,
-			MarkdownDescription: "The login its role is on: `github`, or the cluster's `k8s-{name}`.",
+			MarkdownDescription: "The login its role is on: `github`, or the cluster's `k8s-{name}`. Empty for an Expo consumer, which has no login.",
 			PlanModifiers:       keep,
 		},
 	}
